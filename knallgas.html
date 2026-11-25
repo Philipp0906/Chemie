@@ -1,0 +1,579 @@
+<title>Knallgas-Labor</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: ein Laborbehälter als Bühne, daneben das Messprotokoll (Zähler, Verlauf, Energiediagramm); darunter der Mechanismus. */
+:root {
+  color-scheme: dark;
+  --bg: #0a1120;
+  --panel: #111b30;
+  --panel-2: #0d1628;
+  --line: #22304d;
+  --fg: #e7edf8;
+  --muted: #8b98b5;
+  --flame: #ffae42;
+  --flame-soft: rgba(255, 174, 66, .16);
+  --h: #f3f6fb;
+  --o: #ff4f4a;
+  --water: #5bb9ff;
+  --ok: #6fd3a0;
+  --warn: #ffae42;
+  --crit: #ff5d5d;
+  --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--f-body);
+  font-size: 15px;
+  line-height: 1.55;
+}
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-block: 28px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid;
+  gap: 22px;
+}
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 28px; }
+.eyebrow { font-family: var(--f-mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--flame); }
+h1 {
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: clamp(34px, 6vw, 60px);
+  line-height: .95;
+  letter-spacing: -.02em;
+  margin: 6px 0 0;
+  text-wrap: balance;
+}
+.equation {
+  font-family: var(--f-mono);
+  font-size: clamp(15px, 2.2vw, 20px);
+  color: var(--fg);
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  white-space: nowrap;
+}
+.equation .h { color: var(--h); }
+.equation .o { color: var(--o); }
+.equation .w { color: var(--water); }
+.equation .q { color: var(--flame); }
+
+.lab { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 22px; align-items: start; }
+@media (max-width: 920px) { .lab { grid-template-columns: minmax(0, 1fr); } }
+
+.stage { display: grid; gap: 12px; min-width: 0; }
+.vessel {
+  position: relative;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--panel-2);
+  box-shadow: inset 0 0 0 6px rgba(255,255,255,.015);
+}
+.vessel.shake { animation: shake .35s linear; }
+@keyframes shake {
+  20% { transform: translate(-3px, 2px); } 40% { transform: translate(3px, -2px); }
+  60% { transform: translate(-2px, -1px); } 80% { transform: translate(2px, 1px); }
+}
+@media (prefers-reduced-motion: reduce) { .vessel.shake { animation: none; } }
+canvas#sim { display: block; width: 100%; aspect-ratio: 16 / 10; cursor: crosshair; touch-action: manipulation; }
+.hint {
+  position: absolute; left: 14px; bottom: 12px;
+  font-family: var(--f-mono); font-size: 12px; color: var(--muted);
+  background: rgba(10, 17, 32, .7); padding: 5px 9px; border-radius: 4px;
+  pointer-events: none; transition: opacity .6s;
+}
+.legend {
+  position: absolute; right: 12px; top: 10px; display: flex; gap: 12px;
+  font-family: var(--f-mono); font-size: 12px; color: var(--muted);
+  background: rgba(10, 17, 32, .7); padding: 5px 9px; border-radius: 4px; pointer-events: none;
+}
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: end; }
+.ctrl { display: grid; gap: 4px; min-width: 0; flex: 1 1 200px; }
+.ctrl label { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+.ctrl output { font-family: var(--f-mono); color: var(--fg); letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--flame); }
+.buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+button {
+  font: 600 14px var(--f-body);
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px 14px;
+  cursor: pointer;
+}
+button:hover { border-color: var(--muted); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--flame); outline-offset: 2px; }
+button.ignite { background: var(--flame); color: #1d1206; border-color: var(--flame); }
+button.ignite:hover { filter: brightness(1.08); }
+.toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.toggle input { accent-color: var(--flame); }
+
+aside { display: grid; gap: 14px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 10px; }
+.card h2 { margin: 0; font: 600 12px var(--f-body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.pill { font: 500 12px var(--f-mono); letter-spacing: 0; text-transform: none; padding: 3px 9px; border-radius: 99px; border: 1px solid currentColor; }
+.pill.stable { color: var(--ok); } .pill.running { color: var(--warn); } .pill.boom { color: var(--crit); background: rgba(255,93,93,.12); } .pill.done { color: var(--water); }
+.counts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.count { display: grid; gap: 0; }
+.count b { font: 500 26px var(--f-mono); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.count span { font-size: 12px; color: var(--muted); }
+.readings { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-size: 13px; color: var(--muted); }
+.readings b { font: 500 13px var(--f-mono); color: var(--fg); font-variant-numeric: tabular-nums; display: block; }
+canvas#chart { width: 100%; height: 120px; display: block; }
+svg#energy { width: 100%; height: auto; display: block; }
+svg text { font-family: var(--f-mono); font-size: 11px; }
+.small { font-size: 12px; color: var(--muted); margin: 0; }
+
+.mechanism { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 760px) { .mechanism { grid-template-columns: minmax(0, 1fr); } }
+.step { border-top: 2px solid var(--line); padding-top: 12px; display: grid; gap: 6px; align-content: start; }
+.step.net { border-top-color: var(--flame); }
+.step .num { font: 500 12px var(--f-mono); color: var(--flame); letter-spacing: .08em; text-transform: uppercase; }
+.step .eq { font: 500 16px var(--f-mono); }
+.step p { margin: 0; color: var(--muted); max-width: 60ch; }
+.note { font-size: 13px; color: var(--muted); margin: 0; max-width: 80ch; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Chemie im Teilchenmodell · Simulation</div>
+      <h1>Knallgas-Labor</h1>
+    </div>
+    <div class="equation" aria-label="2 H2 plus O2 reagiert zu 2 H2O, exotherm">
+      <span class="h">2 H₂</span> + <span class="o">O₂</span> → <span class="w">2 H₂O</span> <span class="q">ΔH &lt; 0</span>
+    </div>
+  </header>
+
+  <section class="lab">
+    <div class="stage">
+      <div class="vessel" id="vessel">
+        <canvas id="sim" aria-label="Behälter mit Wasserstoff- und Sauerstoffmolekülen. Klicken zündet einen Funken."></canvas>
+        <div class="legend"><span><i class="dot" style="background:var(--h)"></i>H</span><span><i class="dot" style="background:var(--o)"></i>O</span></div>
+        <div class="hint" id="hint">Tippe in den Behälter, um einen Funken zu zünden</div>
+      </div>
+      <div class="controls">
+        <div class="ctrl">
+          <label for="temp">Wandtemperatur <output id="tempOut">293 K · 20 °C</output></label>
+          <input type="range" id="temp" min="200" max="1500" step="10" value="293">
+        </div>
+        <div class="ctrl">
+          <label for="count">Moleküle (H₂ : O₂ = 2 : 1) <output id="countOut">90</output></label>
+          <input type="range" id="count" min="30" max="180" step="6" value="90">
+        </div>
+        <div class="buttons">
+          <button class="ignite" id="spark">Funke zünden</button>
+          <button id="pause">Pause</button>
+          <button id="reset">Neu befüllen</button>
+          <label class="toggle"><input type="checkbox" id="slow"> Zeitlupe</label>
+        </div>
+      </div>
+    </div>
+
+    <aside>
+      <div class="card">
+        <h2>Behälter <span class="pill stable" id="status">Stabil</span></h2>
+        <div class="counts">
+          <div class="count"><b id="nH2" style="color:var(--h)">0</b><span>H₂</span></div>
+          <div class="count"><b id="nO2" style="color:var(--o)">0</b><span>O₂</span></div>
+          <div class="count"><b id="nH2O" style="color:var(--water)">0</b><span>H₂O</span></div>
+        </div>
+        <div class="readings">
+          <div>Gastemperatur<b id="tGas">–</b></div>
+          <div>O-Radikale<b id="nO">0</b></div>
+          <div>Reaktionen / s<b id="rate">0</b></div>
+          <div>Umsatz<b id="yield">0 %</b></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Verlauf <span class="small">letzte 30 s</span></h2>
+        <canvas id="chart"></canvas>
+      </div>
+
+      <div class="card">
+        <h2>Energiediagramm</h2>
+        <svg id="energy" viewBox="0 0 320 190" role="img" aria-label="Energiediagramm mit Aktivierungsenergie und Reaktionsenthalpie">
+          <line x1="14" y1="10" x2="14" y2="178" stroke="#22304d"/>
+          <text x="20" y="18" fill="#8b98b5">E</text>
+          <path d="M14 112 H70 C108 112 120 34 160 34 C200 34 214 160 252 160 H312" fill="none" stroke="#e7edf8" stroke-width="2"/>
+          <line id="eLine" x1="14" x2="312" y1="112" y2="112" stroke="#ffae42" stroke-width="1.5" stroke-dasharray="4 4"/>
+          <text id="eLabel" x="310" y="106" fill="#ffae42" text-anchor="end">Ø Teilchenenergie</text>
+          <line x1="160" y1="110" x2="160" y2="40" stroke="#8b98b5" stroke-dasharray="2 3"/>
+          <path d="M156 46 L160 38 L164 46" fill="none" stroke="#8b98b5"/>
+          <text x="166" y="80" fill="#e7edf8">Eₐ</text>
+          <line x1="292" y1="114" x2="292" y2="155" stroke="#ffae42"/>
+          <path d="M288 149 L292 157 L296 149" fill="none" stroke="#ffae42"/>
+          <text x="286" y="140" fill="#ffae42" text-anchor="end">ΔH</text>
+          <text x="22" y="130" fill="#e7edf8">2 H₂ + O₂</text>
+          <text x="250" y="176" fill="#5bb9ff">2 H₂O</text>
+        </svg>
+        <p class="small">Steigt die gestrichelte Linie Richtung Eₐ, reichen immer mehr Stöße zur Reaktion. Die frei werdende Wärme heizt die Nachbarn auf: eine Kettenreaktion.</p>
+      </div>
+    </aside>
+  </section>
+
+  <section class="mechanism" aria-label="Vereinfachter Mechanismus">
+    <div class="step">
+      <span class="num">Schritt 1 · Start</span>
+      <span class="eq"><span style="color:var(--h)">H₂</span> + <span style="color:var(--o)">O₂</span> → <span style="color:var(--water)">H₂O</span> + <span style="color:var(--o)">O·</span></span>
+      <p>Hohe Aktivierungsenergie. Bei Raumtemperatur sind fast alle Stöße zu schwach, deshalb ist Knallgas metastabil und kann jahrelang ruhig im Gefäß bleiben.</p>
+    </div>
+    <div class="step">
+      <span class="num">Schritt 2 · Kette</span>
+      <span class="eq"><span style="color:var(--o)">O·</span> + <span style="color:var(--h)">H₂</span> → <span style="color:var(--water)">H₂O</span></span>
+      <p>Das Sauerstoff-Radikal ist sehr reaktiv und braucht kaum Anlaufenergie. Jeder Schritt setzt Wärme frei, die weitere Moleküle über die Schwelle hebt.</p>
+    </div>
+    <div class="step net">
+      <span class="num">Bilanz</span>
+      <span class="eq"><span style="color:var(--h)">2 H₂</span> + <span style="color:var(--o)">O₂</span> → <span style="color:var(--water)">2 H₂O</span></span>
+      <p>ΔH = −242 kJ pro Mol Wasser(dampf). Ein Funke liefert nur die Aktivierungsenergie, den Rest erledigt die Reaktion selbst.</p>
+    </div>
+  </section>
+  <p class="note">Vereinfachtes Modell: In Wirklichkeit läuft die Kettenreaktion über H·-, O·- und OH·-Radikale mit Kettenverzweigung. Größen, Geschwindigkeiten und Energien sind für die Darstellung skaliert; Massenverhältnisse (H = 1, O = 16) und die Selbstentzündung bei rund 850 K sind realistisch nachgebildet.</p>
+</div>
+
+<script>
+(() => {
+  // ---------- Modellkonstanten ----------
+  const K = 48;                    // "Boltzmann-Konstante" in Pixel-Einheiten: mittlere 2D-Energie = K·T
+  const EA1 = 13 * K * 300;        // H2 + O2 -> H2O + O   (hoch: metastabil bei Raumtemperatur)
+  const EA2 = 5 * K * 300;         // O + H2 -> H2O        (niedrig: Radikal)
+  const Q = 55 * K * 300;          // frei werdende Energie pro Schritt
+  const VMAX = 950;
+  const SP = {
+    H2:  { m: 2,  r: 9,  atoms: [['H', -5, 0], ['H', 5, 0]] },
+    O2:  { m: 32, r: 12, atoms: [['O', -6.5, 0], ['O', 6.5, 0]] },
+    H2O: { m: 18, r: 12, atoms: [['H', -8, 5.5], ['H', 8, 5.5], ['O', 0, -1.5]] },
+    O:   { m: 16, r: 8,  atoms: [['O', 0, 0]] }
+  };
+  const ATOM_R = { H: 5.6, O: 8.2 };
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const COL = { H: C('--h'), O: C('--o'), water: C('--water'), flame: C('--flame'), line: C('--line'), muted: C('--muted') };
+
+  const $ = id => document.getElementById(id);
+  const cv = $('sim'), ctx = cv.getContext('2d');
+  const chart = $('chart'), cctx = chart.getContext('2d');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let W = 800, H = 500, S = 1, dpr = 1;
+  let parts = [], fx = [], history = [], reactTimes = [];
+  let Twall = 293, paused = false, total0 = 1, initialH2 = 1;
+  let sprites = {};
+
+  // ---------- Hilfsfunktionen ----------
+  const gauss = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+  const rad = p => SP[p.t].r * S;
+  const ke = p => 0.5 * SP[p.t].m * (p.vx * p.vx + p.vy * p.vy);
+
+  function makeSprite(color, r) {
+    const pad = 2, size = Math.ceil((r + pad) * 2 * dpr);
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    const g = c.getContext('2d'); g.scale(dpr, dpr);
+    const cx = r + pad;
+    const grad = g.createRadialGradient(cx - r * .38, cx - r * .42, r * .1, cx, cx, r);
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(.28, color);
+    grad.addColorStop(1, shade(color, -.55));
+    g.fillStyle = grad; g.beginPath(); g.arc(cx, cx, r, 0, Math.PI * 2); g.fill();
+    return { c, half: cx };
+  }
+  function shade(hex, k) {
+    const n = parseInt(hex.slice(1), 16);
+    const f = x => Math.max(0, Math.min(255, Math.round(x * (1 + k))));
+    return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`;
+  }
+
+  function resize() {
+    const r = cv.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = Math.max(200, r.width); H = Math.max(140, r.height);
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    S = Math.max(.62, Math.min(1.1, W / 820));
+    sprites = { H: makeSprite(COL.H, ATOM_R.H * S), O: makeSprite(COL.O, ATOM_R.O * S) };
+    for (const p of parts) { const rr = rad(p); p.x = Math.min(W - rr, Math.max(rr, p.x)); p.y = Math.min(H - rr, Math.max(rr, p.y)); }
+    const cr = chart.getBoundingClientRect();
+    chart.width = Math.round(cr.width * dpr); chart.height = Math.round(cr.height * dpr);
+    cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function spawn(t, T) {
+    const r = SP[t].r * S;
+    let x, y, ok = false;
+    for (let k = 0; k < 40 && !ok; k++) {
+      x = r + Math.random() * (W - 2 * r); y = r + Math.random() * (H - 2 * r);
+      ok = parts.every(q => (q.x - x) ** 2 + (q.y - y) ** 2 > (rad(q) + r + 2) ** 2);
+    }
+    const sd = Math.sqrt(K * T / SP[t].m);
+    parts.push({ t, x, y, vx: gauss() * sd, vy: gauss() * sd, a: Math.random() * 6.28, w: gauss() * 2, dead: false });
+  }
+
+  function reset() {
+    parts = []; fx = []; history = []; reactTimes = [];
+    const n = +$('count').value;
+    const nH2 = Math.round(n * 2 / 3), nO2 = n - nH2;
+    for (let i = 0; i < nO2; i++) spawn('O2', Twall);
+    for (let i = 0; i < nH2; i++) spawn('H2', Twall);
+    initialH2 = nH2; total0 = n;
+  }
+
+  // ---------- Physik ----------
+  function thermalize(p) {
+    const a = .22, e = ke(p);
+    const en = (1 - a) * e + a * 1.5 * K * Twall * -Math.log(1 - Math.random());
+    const f = e > 1e-6 ? Math.sqrt(en / e) : 1;
+    p.vx *= f; p.vy *= f;
+  }
+
+  function heatBurst(x, y, E) {
+    const R = 70 * S, near = []; let sum = 0;
+    for (const p of parts) {
+      if (p.dead) continue;
+      const d = Math.hypot(p.x - x, p.y - y);
+      if (d < R) { const w = 1 - d / R; near.push([p, w]); sum += w; }
+    }
+    if (!near.length) return;
+    for (const [p, w] of near) {
+      const e = ke(p), en = e + E * w / sum;
+      if (e < 1e-6) { const ang = Math.random() * 6.28, v = Math.sqrt(2 * en / SP[p.t].m); p.vx = Math.cos(ang) * v; p.vy = Math.sin(ang) * v; }
+      else { const f = Math.sqrt(en / e); p.vx *= f; p.vy *= f; }
+      p.w += gauss() * 6;
+    }
+  }
+
+  function flash(x, y, strength) { fx.push({ x, y, life: 0, max: .45 + .25 * strength, r: (26 + 30 * strength) * S, s: strength }); }
+
+  function react(p, q, born, now) {
+    // p, q bereits als passendes Paar erkannt
+    const mp = SP[p.t].m, mq = SP[q.t].m, M = mp + mq;
+    const vcx = (mp * p.vx + mq * q.vx) / M, vcy = (mp * p.vy + mq * q.vy) / M;
+    const mx = (p.x * mq + q.x * mp) / M, my = (p.y * mq + q.y * mp) / M;
+    const mu = mp * mq / M;
+    const erel = 0.5 * mu * ((p.vx - q.vx) ** 2 + (p.vy - q.vy) ** 2);
+    p.dead = q.dead = true;
+    if (p.t === 'O' || q.t === 'O') {
+      born.push({ t: 'H2O', x: mx, y: my, vx: vcx, vy: vcy, a: Math.random() * 6.28, w: gauss() * 5, dead: false });
+      heatBurst(mx, my, erel + Q);
+      flash(mx, my, .7);
+    } else {
+      const ang = Math.random() * 6.28, dx = Math.cos(ang), dy = Math.sin(ang);
+      const mup = 18 * 16 / 34, E = erel + Q * .4, vr = Math.sqrt(2 * E / mup);
+      const off = 6 * S;
+      born.push({ t: 'H2O', x: mx - dx * off, y: my - dy * off, vx: vcx - dx * vr * 16 / 34, vy: vcy - dy * vr * 16 / 34, a: ang, w: gauss() * 5, dead: false });
+      born.push({ t: 'O', x: mx + dx * off, y: my + dy * off, vx: vcx + dx * vr * 18 / 34, vy: vcy + dy * vr * 18 / 34, a: 0, w: 0, dead: false });
+      heatBurst(mx, my, Q * .6);
+      flash(mx, my, 1);
+    }
+    reactTimes.push(now);
+  }
+
+  function step(dt, now) {
+    const subs = 6, h = dt / subs;
+    for (let s = 0; s < subs; s++) {
+      for (const p of parts) {
+        p.x += p.vx * h; p.y += p.vy * h; p.a += p.w * h;
+        const r = rad(p);
+        if (p.x < r) { p.x = r; p.vx = Math.abs(p.vx); thermalize(p); }
+        else if (p.x > W - r) { p.x = W - r; p.vx = -Math.abs(p.vx); thermalize(p); }
+        if (p.y < r) { p.y = r; p.vy = Math.abs(p.vy); thermalize(p); }
+        else if (p.y > H - r) { p.y = H - r; p.vy = -Math.abs(p.vy); thermalize(p); }
+      }
+      const born = [], n = parts.length;
+      for (let i = 0; i < n; i++) {
+        const p = parts[i]; if (p.dead) continue;
+        const rp = rad(p), mp = SP[p.t].m;
+        for (let j = i + 1; j < n; j++) {
+          const q = parts[j]; if (q.dead) continue;
+          const dx = q.x - p.x, dy = q.y - p.y, R = rp + rad(q), d2 = dx * dx + dy * dy;
+          if (d2 >= R * R || d2 === 0) continue;
+          const d = Math.sqrt(d2), nx = dx / d, ny = dy / d, mq = SP[q.t].m;
+          const vn = (q.vx - p.vx) * nx + (q.vy - p.vy) * ny;
+          if (vn < 0) {
+            const en = 0.5 * (mp * mq / (mp + mq)) * vn * vn;
+            const pair = p.t < q.t ? p.t + q.t : q.t + p.t;
+            if ((pair === 'H2O2' && en > EA1) || (pair === 'H2O' && en > EA2)) { react(p, q, born, now); break; }
+            const jimp = -2 * vn / (1 / mp + 1 / mq);
+            p.vx -= jimp * nx / mp; p.vy -= jimp * ny / mp;
+            q.vx += jimp * nx / mq; q.vy += jimp * ny / mq;
+            p.w += (Math.random() - .5) * 2; q.w += (Math.random() - .5) * 2;
+          }
+          const ov = R - d, tot = mp + mq;
+          p.x -= nx * ov * mq / tot; p.y -= ny * ov * mq / tot;
+          q.x += nx * ov * mp / tot; q.y += ny * ov * mp / tot;
+        }
+      }
+      if (born.length || parts.some(p => p.dead)) parts = parts.filter(p => !p.dead).concat(born);
+      for (const p of parts) {
+        const v = Math.hypot(p.vx, p.vy);
+        if (v > VMAX) { p.vx *= VMAX / v; p.vy *= VMAX / v; }
+        p.w *= .999; if (p.w > 14) p.w = 14; if (p.w < -14) p.w = -14;
+      }
+    }
+  }
+
+  // ---------- Zeichnen ----------
+  function gasT() { if (!parts.length) return Twall; let e = 0; for (const p of parts) e += ke(p); return e / parts.length / K; }
+
+  function draw(Tg) {
+    ctx.clearRect(0, 0, W, H);
+    const heat = Math.max(0, Math.min(1, (Tg - 400) / 2600));
+    const bg = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * .75);
+    bg.addColorStop(0, `rgba(255,150,50,${.04 + heat * .22})`);
+    bg.addColorStop(1, 'rgba(255,150,50,0)');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+    // dezentes Raster wie Millimeterpapier
+    ctx.strokeStyle = 'rgba(139,152,181,.06)'; ctx.lineWidth = 1;
+    const g = 40 * S; ctx.beginPath();
+    for (let x = g; x < W; x += g) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+    for (let y = g; y < H; y += g) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+    ctx.stroke();
+
+    // Moleküle
+    for (const p of parts) {
+      const c = Math.cos(p.a), s = Math.sin(p.a);
+      if (p.t === 'O') { // Radikal glüht
+        ctx.fillStyle = 'rgba(255,174,66,.25)';
+        ctx.beginPath(); ctx.arc(p.x, p.y, 13 * S, 0, 6.28); ctx.fill();
+      }
+      for (const [el, ax, ay] of SP[p.t].atoms) {
+        const sp = sprites[el];
+        const x = p.x + (ax * c - ay * s) * S, y = p.y + (ax * s + ay * c) * S;
+        ctx.drawImage(sp.c, x - sp.half, y - sp.half, sp.c.width / dpr, sp.c.height / dpr);
+      }
+    }
+
+    // Lichtblitze
+    ctx.globalCompositeOperation = 'lighter';
+    for (const f of fx) {
+      const k = f.life / f.max, r = f.r * (0.4 + k * 1.4), a = (1 - k) * (.55 + .35 * Math.min(f.s, 1.5));
+      const gr = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, r);
+      gr.addColorStop(0, `rgba(255,240,200,${a})`);
+      gr.addColorStop(.35, `rgba(255,174,66,${a * .7})`);
+      gr.addColorStop(1, 'rgba(255,90,30,0)');
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(f.x, f.y, r, 0, 6.28); ctx.fill();
+      if (f.spark) {
+        ctx.strokeStyle = `rgba(255,230,160,${1 - k})`; ctx.lineWidth = 1.5;
+        for (const ray of f.spark) {
+          const r0 = r * .3, r1 = r * (.6 + ray.l * k);
+          ctx.beginPath(); ctx.moveTo(f.x + Math.cos(ray.a) * r0, f.y + Math.sin(ray.a) * r0);
+          ctx.lineTo(f.x + Math.cos(ray.a) * r1, f.y + Math.sin(ray.a) * r1); ctx.stroke();
+        }
+      }
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  function drawChart() {
+    const w = chart.width / dpr, h = chart.height / dpr;
+    cctx.clearRect(0, 0, w, h);
+    cctx.strokeStyle = 'rgba(139,152,181,.15)'; cctx.lineWidth = 1;
+    cctx.beginPath(); for (let i = 1; i < 4; i++) { const y = Math.round(h * i / 4) + .5; cctx.moveTo(0, y); cctx.lineTo(w, y); } cctx.stroke();
+    if (history.length < 2) return;
+    const N = 300, maxN = Math.max(initialH2, 1) * 1.05;
+    const X = i => w - (history.length - 1 - i) * (w / (N - 1));
+    // Temperatur als Fläche (eigene Skala, bis 4000 K)
+    cctx.beginPath(); cctx.moveTo(X(0), h);
+    history.forEach((d, i) => cctx.lineTo(X(i), h - Math.min(1, d.T / 4000) * h));
+    cctx.lineTo(X(history.length - 1), h); cctx.closePath();
+    cctx.fillStyle = 'rgba(255,174,66,.14)'; cctx.fill();
+    const line = (key, col) => {
+      cctx.beginPath();
+      history.forEach((d, i) => { const y = h - 2 - (d[key] / maxN) * (h - 4); i ? cctx.lineTo(X(i), y) : cctx.moveTo(X(i), y); });
+      cctx.strokeStyle = col; cctx.lineWidth = 2; cctx.stroke();
+      const last = history[history.length - 1];
+      cctx.fillStyle = col; cctx.beginPath(); cctx.arc(X(history.length - 1) - 2, h - 2 - (last[key] / maxN) * (h - 4), 3, 0, 6.28); cctx.fill();
+    };
+    line('H2', COL.H); line('O2', COL.O); line('H2O', COL.water);
+  }
+
+  // ---------- Anzeige ----------
+  const statusEl = $('status');
+  function setStatus(cls, text) { if (statusEl.textContent !== text) { statusEl.className = 'pill ' + cls; statusEl.textContent = text; } }
+
+  function updateStats(Tg, now) {
+    const c = { H2: 0, O2: 0, H2O: 0, O: 0 };
+    for (const p of parts) c[p.t]++;
+    $('nH2').textContent = c.H2; $('nO2').textContent = c.O2; $('nH2O').textContent = c.H2O; $('nO').textContent = c.O;
+    $('tGas').textContent = `${Math.round(Tg)} K`;
+    while (reactTimes.length && now - reactTimes[0] > 1) reactTimes.shift();
+    const rate = reactTimes.length;
+    $('rate').textContent = rate;
+    $('yield').textContent = `${Math.round(100 * (1 - c.H2 / initialH2))} %`;
+    const possible = c.H2 > 0 && (c.O2 > 0 || c.O > 0);
+    if (!possible && c.H2O > 0) setStatus('done', 'Abgeschlossen');
+    else if (rate >= 6) setStatus('boom', 'Explosion!');
+    else if (rate > 0 || c.O > 0) setStatus('running', 'Reaktion läuft');
+    else setStatus('stable', Tg > 700 ? 'Kritisch heiß' : 'Stabil');
+    if (rate >= 9 && !reduced) { const v = $('vessel'); v.classList.remove('shake'); void v.offsetWidth; v.classList.add('shake'); }
+    // Energiediagramm: mittlere Energie relativ zu Ea
+    const frac = Math.min(1.25, Tg / 1200);
+    const y = 112 - frac * (112 - 34);
+    $('eLine').setAttribute('y1', y.toFixed(1)); $('eLine').setAttribute('y2', y.toFixed(1));
+    $('eLabel').setAttribute('y', (y - 6).toFixed(1));
+    return c;
+  }
+
+  // ---------- Steuerung ----------
+  function ignite(x, y) {
+    heatBurst(x, y, 2.6e6);
+    const f = { x, y, life: 0, max: .7, r: 70 * S, s: 1.6, spark: Array.from({ length: 14 }, () => ({ a: Math.random() * 6.28, l: .5 + Math.random() })) };
+    fx.push(f);
+    $('hint').style.opacity = 0;
+  }
+  cv.addEventListener('pointerdown', e => {
+    const r = cv.getBoundingClientRect();
+    ignite(e.clientX - r.left, e.clientY - r.top);
+  });
+  $('spark').addEventListener('click', () => ignite(W * (.35 + Math.random() * .3), H * (.35 + Math.random() * .3)));
+  $('pause').addEventListener('click', () => { paused = !paused; $('pause').textContent = paused ? 'Weiter' : 'Pause'; });
+  $('reset').addEventListener('click', reset);
+  $('temp').addEventListener('input', e => { Twall = +e.target.value; $('tempOut').textContent = `${Twall} K · ${Twall - 273} °C`; });
+  $('count').addEventListener('input', e => { $('countOut').textContent = e.target.value; reset(); });
+  if (reduced) $('slow').checked = true;
+
+  // ---------- Schleife ----------
+  let last = performance.now(), simTime = 0, lastSample = 0, lastStats = 0;
+  function frame(t) {
+    let dt = Math.min(.033, (t - last) / 1000); last = t;
+    if (!paused) {
+      const sdt = dt * ($('slow').checked ? .25 : 1);
+      simTime += sdt;
+      step(sdt, simTime);
+      for (const f of fx) f.life += sdt;
+      fx = fx.filter(f => f.life < f.max);
+    }
+    const Tg = gasT();
+    draw(Tg);
+    if (t - lastStats > 120) {
+      const c = updateStats(Tg, simTime); lastStats = t;
+      if (!paused && simTime - lastSample > .1) {
+        history.push({ H2: c.H2, O2: c.O2, H2O: c.H2O, T: Tg }); lastSample = simTime;
+        if (history.length > 300) history.shift();
+      }
+      drawChart();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  window.addEventListener('resize', resize);
+  resize(); reset();
+  requestAnimationFrame(frame);
+})();
+</script>
